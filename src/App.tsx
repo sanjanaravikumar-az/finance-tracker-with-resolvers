@@ -1,559 +1,121 @@
-import { useEffect, useState } from 'react';
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/api';
-import { signIn, signOut, getCurrentUser, signUp, confirmSignUp } from 'aws-amplify/auth';
-import { uploadData, getUrl } from 'aws-amplify/storage';
-import amplifyconfig from '../amplify_outputs.json';
-import './App.css';
-
-Amplify.configure(amplifyconfig);
-const client = generateClient();
-
-// GraphQL queries and mutations
-const listTransactions = /* GraphQL */ `
-  query ListTransactions {
-    listTransactions {
-      items {
-        id
-        description
-        amount
-        type
-        category
-        date
-        receiptUrl
-      }
-    }
-  }
-`;
-
-const createTransaction = /* GraphQL */ `
-  mutation CreateTransaction($input: CreateTransactionInput!) {
-    createTransaction(input: $input) {
-      id
-      description
-      amount
-      type
-      category
-      date
-      receiptUrl
-    }
-  }
-`;
-
-const calculateFinancialSummaryQuery = /* GraphQL */ `
-  query CalculateFinancialSummary {
-    calculateFinancialSummary {
-      totalIncome
-      totalExpenses
-      balance
-      savingsRate
-    }
-  }
-`;
-
-const sendMonthlyReportMutation = /* GraphQL */ `
-  mutation SendMonthlyReport($email: String!) {
-    sendMonthlyReport(email: $email) {
-      success
-      message
-    }
-  }
-`;
-
-interface Transaction {
-  id: string;
-  description: string;
-  amount: number;
-  type: 'INCOME' | 'EXPENSE';
-  category: string;
-  date: string;
-  receiptUrl?: string;
-}
-
-interface FinancialSummary {
-  totalIncome: number;
-  totalExpenses: number;
-  balance: number;
-  savingsRate: number;
-}
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from './assets/vite.svg'
+import heroImg from './assets/hero.png'
+import './App.css'
 
 function App() {
-  const [user, setUser] = useState<any>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  
-  // Auth state
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmationCode, setConfirmationCode] = useState('');
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
-  
-  // Form state
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
-  const [category, setCategory] = useState('');
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    checkUser();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchTransactions();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (transactions.length > 0) {
-      calculateSummary();
-    }
-  }, [transactions]);
-
-  const checkUser = async () => {
-    try {
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
-    } catch (err) {
-      console.log('Not signed in');
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      await signUp({
-        username: email,
-        password,
-        options: {
-          userAttributes: {
-            email,
-          },
-        },
-      });
-      setNeedsConfirmation(true);
-      alert('Sign up successful! Check your email for confirmation code.');
-    } catch (error: any) {
-      console.error('Error signing up:', error);
-      alert(`Sign up failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      await confirmSignUp({
-        username: email,
-        confirmationCode,
-      });
-      alert('Email confirmed! You can now sign in.');
-      setNeedsConfirmation(false);
-      setAuthMode('signin');
-    } catch (error: any) {
-      console.error('Error confirming sign up:', error);
-      alert(`Confirmation failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      await signIn({ username: email, password });
-      await checkUser();
-    } catch (error: any) {
-      console.error('Error signing in:', error);
-      alert(`Sign in failed: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      setUser(null);
-      setTransactions([]);
-      setSummary(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      setLoading(true);
-      const result: any = await client.graphql({ 
-        query: listTransactions,
-        authMode: 'userPool'
-      });
-      setTransactions(result.data.listTransactions.items);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    
-    if (!description || !amount || !category) {
-      alert('Please fill in all fields');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      
-      let receiptUrl = '';
-      
-      // Upload receipt to S3 if file is selected
-      if (receiptFile) {
-        const fileName = `receipts/${Date.now()}-${receiptFile.name}`;
-        await uploadData({
-          path: fileName,
-          data: receiptFile,
-        }).result;
-        
-        // Get the URL for the uploaded file
-        const urlResult = await getUrl({ path: fileName });
-        receiptUrl = urlResult.url.toString();
-      }
-
-      const input = {
-        description,
-        amount: parseFloat(amount),
-        type,
-        category,
-        date: new Date().toISOString(),
-        receiptUrl: receiptUrl || undefined,
-      };
-
-      await client.graphql({
-        query: createTransaction,
-        variables: { input },
-        authMode: 'userPool'
-      });
-
-      // Reset form
-      setDescription('');
-      setAmount('');
-      setCategory('');
-      setReceiptFile(null);
-      
-      // Refresh transactions
-      await fetchTransactions();
-    } catch (error) {
-      console.error('Error adding transaction:', error);
-      alert('Failed to add transaction');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateSummary = async () => {
-    try {
-      // Call Lambda function via GraphQL query (Lambda reads from DynamoDB)
-      const result: any = await client.graphql({ 
-        query: calculateFinancialSummaryQuery,
-        authMode: 'userPool'
-      });
-      setSummary(result.data.calculateFinancialSummary);
-    } catch (error) {
-      console.error('Error calculating summary via Lambda:', error);
-      // Don't use fallback - show error to user
-      alert('Failed to calculate summary from Lambda. Check console for details.');
-    }
-  };
-
-  const handleSendMonthlyReport = async () => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      const userEmail = user.signInDetails?.loginId || email;
-      
-      console.log('Sending monthly report to:', userEmail);
-      
-      const result: any = await client.graphql({
-        query: sendMonthlyReportMutation,
-        variables: { email: userEmail },
-        authMode: 'userPool'
-      });
-      
-      console.log('Monthly report result:', result);
-      
-      if (result.data.sendMonthlyReport.success) {
-        alert('✅ Monthly report sent to your email!');
-      } else {
-        alert('❌ ' + result.data.sendMonthlyReport.message);
-      }
-    } catch (error: any) {
-      console.error('Error sending monthly report:', error);
-      console.error('Error details:', error.errors || error.message);
-      alert('Failed to send monthly report: ' + (error.errors?.[0]?.message || error.message));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!user) {
-    if (needsConfirmation) {
-      return (
-        <div className="app-container">
-          <h1>💰 Finance Tracker</h1>
-          <div className="auth-container">
-            <h2>Confirm Your Email</h2>
-            <form onSubmit={handleConfirmSignUp}>
-              <div className="form-group">
-                <label>Confirmation Code</label>
-                <input
-                  type="text"
-                  value={confirmationCode}
-                  onChange={(e) => setConfirmationCode(e.target.value)}
-                  placeholder="Enter code from email"
-                  required
-                />
-              </div>
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Confirming...' : 'Confirm Email'}
-              </button>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="app-container">
-        <h1>💰 Finance Tracker</h1>
-        <div className="auth-container">
-          <div className="auth-tabs">
-            <button
-              className={authMode === 'signin' ? 'active' : ''}
-              onClick={() => setAuthMode('signin')}
-            >
-              Sign In
-            </button>
-            <button
-              className={authMode === 'signup' ? 'active' : ''}
-              onClick={() => setAuthMode('signup')}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          {authMode === 'signin' ? (
-            <form onSubmit={handleSignIn}>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  required
-                />
-              </div>
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignUp}>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min 8 characters"
-                  required
-                  minLength={8}
-                />
-              </div>
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Signing up...' : 'Sign Up'}
-              </button>
-            </form>
-          )}
-
-          <p className="demo-note">
-            Demo: Uses Amplify Auth, API (GraphQL), Storage (S3), and Lambda
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const [count, setCount] = useState(0)
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>💰 Finance Tracker</h1>
-        <div className="user-info">
-          <span>Welcome, {user.username}</span>
-          <button onClick={handleSignOut} className="btn-secondary">
-            Sign Out
-          </button>
+    <>
+      <section id="center">
+        <div className="hero">
+          <img src={heroImg} className="base" width="170" height="179" alt="" />
+          <img src={reactLogo} className="framework" alt="React logo" />
+          <img src={viteLogo} className="vite" alt="Vite logo" />
         </div>
-      </header>
-
-      {summary && (
-        <div className="summary-cards">
-          <div className="card income">
-            <h3>Total Income</h3>
-            <p className="amount">${summary.totalIncome.toFixed(2)}</p>
-          </div>
-          <div className="card expense">
-            <h3>Total Expenses</h3>
-            <p className="amount">${summary.totalExpenses.toFixed(2)}</p>
-          </div>
-          <div className="card balance">
-            <h3>Balance</h3>
-            <p className="amount">${summary.balance.toFixed(2)}</p>
-          </div>
-          <div className="card savings">
-            <h3>Savings Rate</h3>
-            <p className="amount">{summary.savingsRate}%</p>
-          </div>
+        <div>
+          <h1>Get started</h1>
+          <p>
+            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+          </p>
         </div>
-      )}
-
-      <div className="email-actions">
-        <button 
-          onClick={handleSendMonthlyReport} 
-          className="btn-email"
-          disabled={loading}
+        <button
+          className="counter"
+          onClick={() => setCount((count) => count + 1)}
         >
-          📧 Email Monthly Report
+          Count is {count}
         </button>
-      </div>
+      </section>
 
-      <div className="main-content">
-        <div className="form-section">
-          <h2>Add Transaction</h2>
-          <form onSubmit={handleAddTransaction}>
-            <div className="form-group">
-              <label>Type</label>
-              <select value={type} onChange={(e) => setType(e.target.value as 'INCOME' | 'EXPENSE')}>
-                <option value="EXPENSE">Expense</option>
-                <option value="INCOME">Income</option>
-              </select>
-            </div>
+      <div className="ticks"></div>
 
-            <div className="form-group">
-              <label>Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g., Grocery shopping"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Category</label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g., Food, Salary, Entertainment"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Receipt (Optional - S3 Storage)</label>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-              />
-            </div>
-
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Adding...' : 'Add Transaction'}
-            </button>
-          </form>
+      <section id="next-steps">
+        <div id="docs">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#documentation-icon"></use>
+          </svg>
+          <h2>Documentation</h2>
+          <p>Your questions, answered</p>
+          <ul>
+            <li>
+              <a href="https://vite.dev/" target="_blank">
+                <img className="logo" src={viteLogo} alt="" />
+                Explore Vite
+              </a>
+            </li>
+            <li>
+              <a href="https://react.dev/" target="_blank">
+                <img className="button-icon" src={reactLogo} alt="" />
+                Learn more
+              </a>
+            </li>
+          </ul>
         </div>
-
-        <div className="transactions-section">
-          <h2>Recent Transactions</h2>
-          {loading && <p>Loading...</p>}
-          {transactions.length === 0 && !loading && (
-            <p className="empty-state">No transactions yet. Add your first one!</p>
-          )}
-          <div className="transactions-list">
-            {transactions.map((transaction) => (
-              <div key={transaction.id} className={`transaction-item ${transaction.type.toLowerCase()}`}>
-                <div className="transaction-info">
-                  <h4>{transaction.description}</h4>
-                  <p className="category">{transaction.category}</p>
-                  <p className="date">{new Date(transaction.date).toLocaleDateString()}</p>
-                  {transaction.receiptUrl && (
-                    <a href={transaction.receiptUrl} target="_blank" rel="noopener noreferrer" className="receipt-link">
-                      📎 View Receipt
-                    </a>
-                  )}
-                </div>
-                <div className="transaction-amount">
-                  <span className={transaction.type === 'INCOME' ? 'positive' : 'negative'}>
-                    {transaction.type === 'INCOME' ? '+' : '-'}${transaction.amount.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div id="social">
+          <svg className="icon" role="presentation" aria-hidden="true">
+            <use href="/icons.svg#social-icon"></use>
+          </svg>
+          <h2>Connect with us</h2>
+          <p>Join the Vite community</p>
+          <ul>
+            <li>
+              <a href="https://github.com/vitejs/vite" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#github-icon"></use>
+                </svg>
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href="https://chat.vite.dev/" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#discord-icon"></use>
+                </svg>
+                Discord
+              </a>
+            </li>
+            <li>
+              <a href="https://x.com/vite_js" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#x-icon"></use>
+                </svg>
+                X.com
+              </a>
+            </li>
+            <li>
+              <a href="https://bsky.app/profile/vite.dev" target="_blank">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#bluesky-icon"></use>
+                </svg>
+                Bluesky
+              </a>
+            </li>
+          </ul>
         </div>
-      </div>
+      </section>
 
-      <footer className="app-footer">
-        <p>
-          🔧 Powered by: Amplify Auth • GraphQL API • S3 Storage • Lambda Functions • Custom Resources
-        </p>
-      </footer>
-    </div>
-  );
+      <div className="ticks"></div>
+      <section id="spacer"></section>
+    </>
+  )
 }
 
-export default App;
+export default App

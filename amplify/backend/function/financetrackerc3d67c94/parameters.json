@@ -1,0 +1,10 @@
+{
+  "lambdaLayers": [],
+  "dependsOn": [
+    {
+      "category": "custom",
+      "resourceName": "customfinance",
+      "attributes": ["BudgetAlertTopicArn", "MonthlyReportTopicArn"]
+    }
+  ]
+}

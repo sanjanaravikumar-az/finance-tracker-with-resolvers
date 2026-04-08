@@ -1,0 +1,16 @@
+{
+  "resourceName": "s34bacc4ab",
+  "policyUUID": "4bacc4ab",
+  "bucketName": "financetracker349e4525efd5465ab4e130b672f512e4",
+  "storageAccess": "authAndGuest",
+  "guestAccess": [
+    "READ"
+  ],
+  "authAccess": [
+    "CREATE_AND_UPDATE",
+    "READ",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE",
+  "groupAccess": {}
+}

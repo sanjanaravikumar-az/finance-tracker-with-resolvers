@@ -1,0 +1,89 @@
+{
+  "api": {
+    "financetracker": {
+      "dependsOn": [],
+      "output": {
+        "authConfig": {
+          "additionalAuthenticationProviders": [],
+          "defaultAuthentication": {
+            "apiKeyConfig": {
+              "apiKeyExpirationDate": "2027-04-08T19:25:03.220Z",
+              "apiKeyExpirationDays": 365,
+              "description": "graphql"
+            },
+            "authenticationType": "API_KEY"
+          }
+        }
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "AppSync"
+    }
+  },
+  "auth": {
+    "financetracker9d75f4c7": {
+      "customAuth": false,
+      "dependsOn": [],
+      "frontendAuthConfig": {
+        "mfaConfiguration": "OFF",
+        "mfaTypes": [
+          "SMS"
+        ],
+        "passwordProtectionSettings": {
+          "passwordPolicyCharacters": [],
+          "passwordPolicyMinLength": 8
+        },
+        "signupAttributes": [
+          "EMAIL"
+        ],
+        "socialProviders": [],
+        "usernameAttributes": [
+          "EMAIL"
+        ],
+        "verificationMechanisms": [
+          "EMAIL"
+        ]
+      },
+      "providerPlugin": "awscloudformation",
+      "service": "Cognito"
+    }
+  },
+  "custom": {
+    "customfinance": {
+      "providerPlugin": "awscloudformation",
+      "service": "customCDK"
+    }
+  },
+  "function": {
+    "financetrackerc3d67c94": {
+      "build": true,
+      "dependsOn": [],
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    }
+  },
+  "parameters": {
+    "AMPLIFY_function_financetrackerc3d67c94_deploymentBucketName": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "financetrackerc3d67c94"
+        }
+      ]
+    },
+    "AMPLIFY_function_financetrackerc3d67c94_s3Key": {
+      "usedBy": [
+        {
+          "category": "function",
+          "resourceName": "financetrackerc3d67c94"
+        }
+      ]
+    }
+  },
+  "storage": {
+    "s34bacc4ab": {
+      "dependsOn": [],
+      "providerPlugin": "awscloudformation",
+      "service": "S3"
+    }
+  }
+}
