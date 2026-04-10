@@ -51,6 +51,21 @@
     "customfinance": {
       "providerPlugin": "awscloudformation",
       "service": "customCDK"
+    },
+    "customresolver": {
+      "dependsOn": [
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput",
+            "GraphQLAPIKeyOutput"
+          ],
+          "category": "api",
+          "resourceName": "financetracker"
+        }
+      ],
+      "providerPlugin": "awscloudformation",
+      "service": "customCDK"
     }
   },
   "function": {
