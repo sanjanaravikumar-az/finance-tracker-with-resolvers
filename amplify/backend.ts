@@ -37,18 +37,7 @@ userPool.addClient('NativeAppClient', {
   generateSecret: false,
 });
 
-// Storage configuration
-const s3Bucket = backend.storage.resources.cfnResources.cfnBucket;
-s3Bucket.bucketEncryption = {
-  serverSideEncryptionConfiguration: [
-    {
-      serverSideEncryptionByDefault: {
-        sseAlgorithm: 'AES256',
-      },
-      bucketKeyEnabled: false,
-    },
-  ],
-};
+// Storage encryption configured by default in Gen2
 
 // Custom resources
 new cdkStack(backend.createStack('customfinance'), 'customfinance');
