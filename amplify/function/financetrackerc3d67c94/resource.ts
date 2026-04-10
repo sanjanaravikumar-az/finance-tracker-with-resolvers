@@ -7,6 +7,11 @@ export const financetrackerc3d67c94 = defineFunction({
   name: `financetrackerc3d67c94-${branchName}`,
   timeoutSeconds: 25,
   memoryMB: 128,
+  bundling: {
+    format: "esm",
+    minify: false,
+    esbuildArgs: { "--external:@aws-sdk/*": "" }
+  },
   environment: {
     BUDGET_ALERT_TOPIC_ARN: 'NONE',
     MONTHLY_REPORT_TOPIC_ARN: 'NONE',
@@ -14,4 +19,5 @@ export const financetrackerc3d67c94 = defineFunction({
     REGION: 'us-east-1',
   },
   runtime: 22,
+  resourceGroupName: "data",
 });
