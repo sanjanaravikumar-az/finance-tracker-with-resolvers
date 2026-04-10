@@ -8,9 +8,7 @@ export const financetrackerc3d67c94 = defineFunction({
   timeoutSeconds: 25,
   memoryMB: 128,
   bundling: {
-    format: "esm",
     minify: false,
-    esbuildArgs: { "--external:@aws-sdk/*": "" }
   },
   environment: {
     BUDGET_ALERT_TOPIC_ARN: 'NONE',
