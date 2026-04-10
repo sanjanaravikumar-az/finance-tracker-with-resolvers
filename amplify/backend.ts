@@ -35,11 +35,9 @@ userPool.addClient('NativeAppClient', {
   generateSecret: false,
 });
 new cdkStack(backend.createStack('customfinance'), 'customfinance');
-new customresolver_cdkStack(
-  backend.createStack('customresolver'),
-  'customresolver',
-  backend
-);
+// Place resolver in the data stack to avoid circular dependency
+const dataStack = backend.data.resources.cfnResources.cfnGraphqlApi.stack;
+new customresolver_cdkStack(dataStack, 'customresolver', backend);
 const branchName = process.env.AWS_BRANCH ?? 'sandbox';
 backend.financetrackerc3d67c94.resources.cfnResources.cfnFunction.functionName = `financetrackerc3d67c94-${branchName}`;
 backend.financetrackerc3d67c94.addEnvironment(
@@ -69,8 +67,6 @@ backend.data.resources.graphqlApi.grantQuery(
   backend.financetrackerc3d67c94.resources.lambda
 );
 const s3Bucket = backend.storage.resources.cfnResources.cfnBucket;
-// Use this bucket name post refactor
-// s3Bucket.bucketName = 'financetracker349e4525efd5465ab4e130b672f512e467fcf-dev';
 s3Bucket.bucketEncryption = {
   serverSideEncryptionConfiguration: [
     {
