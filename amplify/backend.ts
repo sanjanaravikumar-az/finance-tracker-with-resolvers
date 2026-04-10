@@ -13,6 +13,8 @@ const backend = defineBackend({
   storage,
   financetrackerc3d67c94,
 });
+
+// Auth configuration
 const cfnUserPool = backend.auth.resources.cfnResources.cfnUserPool;
 cfnUserPool.usernameAttributes = ['email'];
 cfnUserPool.policies = {
@@ -34,10 +36,26 @@ userPool.addClient('NativeAppClient', {
   disableOAuth: true,
   generateSecret: false,
 });
+
+// Storage configuration
+const s3Bucket = backend.storage.resources.cfnResources.cfnBucket;
+s3Bucket.bucketEncryption = {
+  serverSideEncryptionConfiguration: [
+    {
+      serverSideEncryptionByDefault: {
+        sseAlgorithm: 'AES256',
+      },
+      bucketKeyEnabled: false,
+    },
+  ],
+};
+
+// Custom resources
 new cdkStack(backend.createStack('customfinance'), 'customfinance');
-// Place resolver in the data stack to avoid circular dependency
 const dataStack = backend.data.resources.cfnResources.cfnGraphqlApi.stack;
 new customresolver_cdkStack(dataStack, 'customresolver', backend);
+
+// Lambda function configuration (in data stack via resourceGroupName)
 const branchName = process.env.AWS_BRANCH ?? 'sandbox';
 backend.financetrackerc3d67c94.resources.cfnResources.cfnFunction.functionName = `financetrackerc3d67c94-${branchName}`;
 backend.financetrackerc3d67c94.addEnvironment(
@@ -56,24 +74,9 @@ backend.financetrackerc3d67c94.addEnvironment(
   'API_FINANCETRACKER_TRANSACTIONTABLE_NAME',
   backend.data.resources.tables['Transaction'].tableName
 );
-backend.financetrackerc3d67c94.addEnvironment(
-  'AUTH_FINANCETRACKERB192A2D4_USERPOOLID',
-  backend.auth.resources.userPool.userPoolId
-);
 backend.data.resources.graphqlApi.grantMutation(
   backend.financetrackerc3d67c94.resources.lambda
 );
 backend.data.resources.graphqlApi.grantQuery(
   backend.financetrackerc3d67c94.resources.lambda
 );
-const s3Bucket = backend.storage.resources.cfnResources.cfnBucket;
-s3Bucket.bucketEncryption = {
-  serverSideEncryptionConfiguration: [
-    {
-      serverSideEncryptionByDefault: {
-        sseAlgorithm: 'AES256',
-      },
-      bucketKeyEnabled: false,
-    },
-  ],
-};
