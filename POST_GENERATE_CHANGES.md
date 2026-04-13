@@ -274,3 +274,44 @@ In `amplify/custom/customresolver/resource.ts`, remove unused imports:
 
 **Why:** The `appsync` import is unused (code uses `cdk.aws_appsync.CfnDataSource` instead)
 and `projectName` is declared but never read. These cause TypeScript warnings.
+
+## 12. Fix Auth Mode for Lambda-Backed Operations
+
+In `src/App.tsx`, use `apiKey` auth mode for Lambda-backed operations and `userPool` for
+model operations:
+
+```diff
+ // Model operations - use userPool (per-user data with owner field)
+ const result = await client.graphql({ query: listTransactions, authMode: 'userPool' });
+ await client.graphql({ query: createTransaction, variables: { input }, authMode: 'userPool' });
+
+ // Lambda-backed operations - use apiKey (global public auth rule)
+-const result = await client.graphql({ query: calculateFinancialSummaryQuery, authMode: 'userPool' });
++const result = await client.graphql({ query: calculateFinancialSummaryQuery, authMode: 'apiKey' });
+
+-const result = await client.graphql({ query: sendMonthlyReportMutation, variables: { email }, authMode: 'userPool' });
++const result = await client.graphql({ query: sendMonthlyReportMutation, variables: { email }, authMode: 'apiKey' });
+
+-const result = await client.graphql({ query: sendBudgetAlertMutation, variables: { ... }, authMode: 'userPool' });
++const result = await client.graphql({ query: sendBudgetAlertMutation, variables: { ... }, authMode: 'apiKey' });
+
+-const result = await client.graphql({ query: getTransactionsByCategoryQuery, variables: { ... }, authMode: 'userPool' });
++const result = await client.graphql({ query: getTransactionsByCategoryQuery, variables: { ... }, authMode: 'apiKey' });
+```
+
+**Why:** The schema has two types of operations with different authorization:
+
+1. Model operations (`listTransactions`, `createTransaction`) - These are auto-generated
+   by the `@model` directive. With `defaultAuthorizationMode: 'userPool'`, they require
+   Cognito User Pool authentication. The `owner` field on models enforces per-user access.
+
+2. Custom operations (`calculateFinancialSummary`, `sendMonthlyReport`, `sendBudgetAlert`,
+   `getTransactionsByCategory`) - These use the `@function` directive or custom VTL
+   resolvers. They inherit the global auth rule `input AMPLIFY { globalAuthRule: AuthRule =
+   { allow: public } }` which maps to API key authentication. Sending `userPool` auth to
+   these operations causes "Not Authorized" errors because the schema's authorization rule
+   for these operations expects API key auth, not Cognito tokens.
+
+In Gen1, this wasn't an issue because the default auth mode was `apiKey` for everything.
+After switching to `userPool` as the default in Gen2, the client must explicitly specify
+the correct auth mode per operation type.
