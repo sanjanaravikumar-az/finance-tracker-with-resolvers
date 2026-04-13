@@ -225,7 +225,7 @@ function App() {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const result: any = await client.graphql({ query: listTransactions });
+      const result: any = await client.graphql({ query: listTransactions, authMode: 'userPool' });
       setTransactions(result.data.listTransactions.items);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -272,6 +272,7 @@ function App() {
       await client.graphql({
         query: createTransaction,
         variables: { input },
+        authMode: 'userPool',
       });
 
       // Reset form
@@ -295,6 +296,7 @@ function App() {
       // Call Lambda function via GraphQL query (Lambda reads from DynamoDB)
       const result: any = await client.graphql({
         query: calculateFinancialSummaryQuery,
+        authMode: 'userPool',
       });
       setSummary(result.data.calculateFinancialSummary);
     } catch (error) {
@@ -315,6 +317,7 @@ function App() {
       const result: any = await client.graphql({
         query: getTransactionsByCategoryQuery,
         variables: { category: filterCategory, limit: 50 },
+        authMode: 'userPool',
       });
       setFilteredTransactions(result.data.getTransactionsByCategory.items || []);
       setShowFiltered(true);
@@ -344,6 +347,7 @@ function App() {
       const result: any = await client.graphql({
         query: sendMonthlyReportMutation,
         variables: { email: userEmail },
+        authMode: 'userPool',
       });
 
       console.log('Monthly report result:', result);
@@ -384,6 +388,7 @@ function App() {
       const result: any = await client.graphql({
         query: sendBudgetAlertMutation,
         variables: { email: userEmail, category: alertCategory, exceeded },
+        authMode: 'userPool',
       });
 
       if (result.data.sendBudgetAlert.success) {

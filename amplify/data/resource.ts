@@ -78,7 +78,7 @@ export const data = defineData({
     },
   ],
   authorizationModes: {
-    defaultAuthorizationMode: 'apiKey',
+    defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
   },
   schema,

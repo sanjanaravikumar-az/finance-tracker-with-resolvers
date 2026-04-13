@@ -7,6 +7,9 @@ export const financetrackerc3d67c94 = defineFunction({
   name: `financetrackerc3d67c94-${branchName}`,
   timeoutSeconds: 25,
   memoryMB: 128,
+  bundling: {
+    minify: false,
+  },
   environment: {
     BUDGET_ALERT_TOPIC_ARN:
       'arn:aws:sns:us-east-1:079385506759:finance-budget-alerts-dev',
@@ -16,4 +19,5 @@ export const financetrackerc3d67c94 = defineFunction({
     REGION: 'us-east-1',
   },
   runtime: 22,
+  resourceGroupName: 'data',
 });
