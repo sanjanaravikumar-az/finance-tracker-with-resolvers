@@ -1,6 +1,6 @@
 [
   {
-    "Action": ["sns:Publish", "sns:ListTopics", "sns:CreateTopic", "sns:Subscribe"],
+    "Action": ["sns:Publish"],
     "Resource": ["*"]
   },
   {
