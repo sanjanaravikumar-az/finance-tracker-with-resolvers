@@ -1,9 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as appsync from "aws-cdk-lib/aws-appsync";
 import * as iam from 'aws-cdk-lib/aws-iam';
 const branchName = process.env.AWS_BRANCH ?? "sandbox";
-const projectName = "financetracker";
 export class cdkStack extends Construct {
     constructor(scope: Construct, id: string, backend: any) {
         super(scope, id);
