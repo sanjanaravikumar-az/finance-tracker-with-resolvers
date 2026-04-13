@@ -241,3 +241,36 @@ Change `npm ci` to `npm install` in both backend and frontend build phases:
 
 **Why:** The build server's npm version differs from local, causing `npm ci` to fail with
 lockfile mismatch errors. `npm install` is more flexible with version resolution.
+
+## 10. Upgrade TypeScript to v5
+
+In `package.json`, upgrade TypeScript from v4 to v5:
+
+```diff
+ "devDependencies": {
+-  "typescript": "^4.9.5",
++  "typescript": "^5.0.0",
+ }
+```
+
+**Why:** The `@aws-amplify/data-schema` package uses `const` type parameters
+(`const values extends readonly string[]`) which require TypeScript 5.0+. The migration
+tool sets TypeScript to `^4.9.5` which can't parse these type declarations, causing
+hundreds of type errors in `node_modules/@aws-amplify/data-schema`.
+
+## 11. Clean Up Unused Imports in Custom Resources
+
+In `amplify/custom/customresolver/resource.ts`, remove unused imports:
+
+```diff
+ import * as cdk from 'aws-cdk-lib';
+ import { Construct } from 'constructs';
+-import * as appsync from "aws-cdk-lib/aws-appsync";
+ import * as iam from 'aws-cdk-lib/aws-iam';
+-const branchName = process.env.AWS_BRANCH ?? "sandbox";
+-const projectName = "financetracker";
++const branchName = process.env.AWS_BRANCH ?? "sandbox";
+```
+
+**Why:** The `appsync` import is unused (code uses `cdk.aws_appsync.CfnDataSource` instead)
+and `projectName` is declared but never read. These cause TypeScript warnings.
