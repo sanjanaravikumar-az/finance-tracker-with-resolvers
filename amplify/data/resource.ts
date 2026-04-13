@@ -1,4 +1,6 @@
-# This "input" configures a global authorization rule to enable public access to
+import { defineData } from '@aws-amplify/backend';
+
+const schema = `# This "input" configures a global authorization rule to enable public access to
 # all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/cli/graphql/authorization-rules
 input AMPLIFY { globalAuthRule: AuthRule = { allow: public } } # FOR TESTING ONLY!
 
@@ -61,4 +63,23 @@ type Query {
 type Mutation {
   sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-dev")
   sendBudgetAlert(email: String!, category: String!, exceeded: Float!): NotificationResult @function(name: "financetrackere30b1453-dev")
-}
+}`;
+
+export const data = defineData({
+  migratedAmplifyGen1DynamoDbTableMappings: [
+    {
+      //The "branchname" variable needs to be the same as your deployment branch if you want to reuse your Gen1 app tables
+      branchName: 'dev',
+      modelNameToTableNameMapping: {
+        Transaction: 'Transaction-2wfenq2x7zcnlibkicixwspyry-dev',
+        Budget: 'Budget-2wfenq2x7zcnlibkicixwspyry-dev',
+        FinancialSummary: 'FinancialSummary-2wfenq2x7zcnlibkicixwspyry-dev',
+      },
+    },
+  ],
+  authorizationModes: {
+    defaultAuthorizationMode: 'apiKey',
+    apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
+  },
+  schema,
+});
