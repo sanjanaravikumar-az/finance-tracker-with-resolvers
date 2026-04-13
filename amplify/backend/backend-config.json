@@ -79,6 +79,22 @@
           ],
           "category": "custom",
           "resourceName": "customfinance"
+        },
+        {
+          "attributes": [
+            "GraphQLAPIIdOutput",
+            "GraphQLAPIEndpointOutput",
+            "GraphQLAPIKeyOutput"
+          ],
+          "category": "api",
+          "resourceName": "financetracker"
+        },
+        {
+          "attributes": [
+            "UserPoolId"
+          ],
+          "category": "auth",
+          "resourceName": "financetracker9d75f4c7"
         }
       ],
       "providerPlugin": "awscloudformation",
