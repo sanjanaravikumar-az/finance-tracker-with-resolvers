@@ -100,3 +100,8 @@ Fixed deployment issues in the Lambda function's CloudFormation template.
    circular dependencies in Gen2's nested stack architecture
 6. Lambda handler not converted from CommonJS to ESM
 7. AWS SDK packages need special handling for esbuild bundling
+8. `@function` directive generates `@aws_iam` auth in Gen2 instead of respecting the
+   global `allow: public` rule - requires manually adding `@aws_api_key` and/or
+   `@aws_cognito_user_pools` directives to custom queries/mutations
+9. TypeScript version set to ^4.9.5 by migration tool, but `@aws-amplify/data-schema`
+   requires TypeScript 5.0+ for `const` type parameters

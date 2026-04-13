@@ -66,9 +66,10 @@ In `amplify/function/financetrackerc3d67c94/resource.ts`:
 - `resourceGroupName: 'data'` places the function in the data stack, avoiding circular
   dependencies between the function, data, and auth stacks.
 
-## 4. Root `package.json`: Clean Up Dependencies
+## 4. Root `package.json`: Clean Up Dependencies and Upgrade TypeScript
 
-Move AWS SDK packages from `dependencies` to `devDependencies` and remove Gen1-only packages:
+Move AWS SDK packages from `dependencies` to `devDependencies`, remove Gen1-only packages,
+and upgrade TypeScript to v5:
 
 ```diff
  "dependencies": {
@@ -86,34 +87,71 @@ Move AWS SDK packages from `dependencies` to `devDependencies` and remove Gen1-o
 +  "@aws-sdk/client-sns": "^3.821.0",
 +  "@aws-sdk/client-sts": "^3.821.0",
 +  "@aws-sdk/lib-dynamodb": "^3.821.0",
+-  "typescript": "^4.9.5",
++  "typescript": "^5.0.0",
    ...
  }
 ```
 
 **Why:**
-- AWS SDK packages in `dependencies` conflict with `@aws-amplify/backend`'s peer dep on
-  `aws-cdk-lib` (different versions pulled transitively).
+- AWS SDK packages in `dependencies` cause peer dep conflicts with `@aws-amplify/backend`'s
+  `aws-cdk-lib` requirement (different versions pulled transitively via
+  `@aws-amplify/cli-extensibility-helper`).
 - `@aws-sdk/client-ssm` was only needed by the Gen1 custom resource's own `package.json`.
-- SDK packages in `devDependencies` are available for esbuild bundling without causing
-  peer dep conflicts.
+- SDK packages in `devDependencies` are available for esbuild bundling without conflicts.
+- TypeScript 5.0+ is required because `@aws-amplify/data-schema` uses `const` type
+  parameters (`const values extends readonly string[]`) which are a TS 5.0 feature.
+  The migration tool sets TypeScript to `^4.9.5` which can't parse these declarations.
 
-## 5. Data Resource: Switch Default Auth to `userPool`
+## 5. Schema: Add Auth Directives to Custom Operations
+
+In the schema within `amplify/data/resource.ts`, add `@aws_api_key` and
+`@aws_cognito_user_pools` directives to all custom queries and mutations:
+
+```diff
+ type Query {
+-  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-dev")
+-  getTransactionsByCategory(category: String!, limit: Int): TransactionConnection
++  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
++  getTransactionsByCategory(category: String!, limit: Int): TransactionConnection @aws_api_key @aws_cognito_user_pools
+ }
+
+ type Mutation {
+-  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-dev")
+-  sendBudgetAlert(...): NotificationResult @function(name: "financetrackere30b1453-dev")
++  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
++  sendBudgetAlert(...): NotificationResult @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
+ }
+```
+
+**Why:** In Gen2, the `@function` directive generates `@aws_iam` auth on the resolver by
+default. This means only IAM-signed requests can access these operations. In Gen1, the
+`@function` directive respected the global `allow: public` auth rule (API key).
+
+Without adding `@aws_cognito_user_pools`, signed-in users sending Cognito tokens get
+"Not Authorized to access sendMonthlyReport on type Mutation" errors, because the resolver
+only accepts IAM auth.
+
+Adding both `@aws_api_key` and `@aws_cognito_user_pools` allows these operations to be
+called with either auth method, matching the Gen1 behavior where any authenticated or
+public request could invoke them.
+
+## 6. Data Resource: Switch Default Auth to `userPool`
 
 In `amplify/data/resource.ts`:
 
 ```diff
  authorizationModes: {
 -  defaultAuthorizationMode: 'apiKey',
--  apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
 +  defaultAuthorizationMode: 'userPool',
-+  apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
+   apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
  },
 ```
 
-**Why:** The API needs Cognito User Pool auth for authenticated users. Without this,
-signed-in users get "Unauthorized" errors because the API defaults to API key auth.
+**Why:** The API needs Cognito User Pool auth for authenticated users to access their own
+data. Without this, the `owner` field on models doesn't enforce per-user access control.
 
-## 6. Frontend `App.tsx`: Add `authMode: 'userPool'` to GraphQL Calls
+## 7. Frontend `App.tsx`: Add `authMode: 'userPool'` to All GraphQL Calls
 
 Add `authMode: 'userPool'` to all `client.graphql()` calls:
 
@@ -122,13 +160,16 @@ Add `authMode: 'userPool'` to all `client.graphql()` calls:
 +const result = await client.graphql({ query: listTransactions, authMode: 'userPool' });
 ```
 
-Apply to: `listTransactions`, `createTransaction`, `calculateFinancialSummary`,
-`sendMonthlyReport`, `sendBudgetAlert`, `getTransactionsByCategory`.
+Apply to all operations: `listTransactions`, `createTransaction`,
+`calculateFinancialSummary`, `sendMonthlyReport`, `sendBudgetAlert`,
+`getTransactionsByCategory`.
 
-**Why:** With `defaultAuthorizationMode: 'userPool'`, the client must explicitly use
-`userPool` auth mode to send the Cognito token instead of the API key.
+**Why:** With `defaultAuthorizationMode: 'userPool'`, the client must explicitly specify
+`authMode: 'userPool'` to send the Cognito token. This works for both model operations
+(per-user data) and custom operations (now that we added `@aws_cognito_user_pools` to
+the schema in step 5).
 
-## 7. Remove Unnecessary Cross-Resource References
+## 8. Remove Unnecessary Cross-Resource References
 
 ### `amplify/backend.ts`
 
@@ -157,8 +198,6 @@ Remove these lines that create unnecessary cross-stack dependencies:
 -backend.data.resources.graphqlApi.grantQuery(
 -  backend.financetrackerc3d67c94.resources.lambda
 -);
--const s3Bucket = backend.storage.resources.cfnResources.cfnBucket;
--s3Bucket.bucketEncryption = { ... };
 ```
 
 Keep only:
@@ -173,14 +212,18 @@ backend.financetrackerc3d67c94.addEnvironment(
 - The Lambda is an AppSync resolver (called BY AppSync), not an API client. It doesn't
   need `grantMutation`/`grantQuery` or the API key/endpoint/ID.
 - The Lambda never calls Cognito, so it doesn't need the UserPoolId.
-- These references were auto-injected by Gen1's `@function` directive and create
-  cross-stack circular dependencies in Gen2's nested stack architecture.
+- These references were auto-injected by Gen1's `@function` directive into the Lambda's
+  CloudFormation template. The migration tool faithfully ported them, but in Gen2's nested
+  stack architecture they create cross-stack circular dependencies that didn't exist in
+  Gen1's flat stack structure.
 
 ### `amplify/auth/resource.ts`
 
 Remove all `access` rules granting the Lambda Cognito permissions:
 
 ```diff
+-import { financetrackerc3d67c94 } from '../function/financetrackerc3d67c94/resource';
+-
  export const auth = defineAuth({
    loginWith: { ... },
    userAttributes: { ... },
@@ -188,23 +231,27 @@ Remove all `access` rules granting the Lambda Cognito permissions:
 -  access: (allow) => [
 -    allow.resource(financetrackerc3d67c94).to(['manageUsers']),
 -    allow.resource(financetrackerc3d67c94).to(['manageGroupMembership']),
--    ... (11 rules total)
+-    allow.resource(financetrackerc3d67c94).to(['manageUserDevices']),
+-    allow.resource(financetrackerc3d67c94).to(['managePasswordRecovery']),
+-    allow.resource(financetrackerc3d67c94).to(['setUserMfaPreference']),
+-    allow.resource(financetrackerc3d67c94).to(['updateUserAttributes']),
+-    allow.resource(financetrackerc3d67c94).to(['forgetDevice']),
+-    allow.resource(financetrackerc3d67c94).to(['setUserSettings']),
+-    allow.resource(financetrackerc3d67c94).to(['listUsers']),
+-    allow.resource(financetrackerc3d67c94).to(['listUsersInGroup']),
+-    allow.resource(financetrackerc3d67c94).to(['listGroups']),
 -  ],
  });
 ```
 
-Also remove the unused import:
-```diff
--import { financetrackerc3d67c94 } from '../function/financetrackerc3d67c94/resource';
-```
-
 **Why:** The Lambda never manages Cognito users. These rules were auto-generated from
-Gen1's `@function` directive IAM policies and create an auth→function dependency that
-contributes to circular dependencies.
+Gen1's `@function` directive IAM policies (which gave the Lambda full Cognito access by
+default). In Gen2, these create an explicit auth→function dependency that contributes to
+circular dependencies. The Lambda only needs to scan DynamoDB and publish to SNS.
 
-## 8. Fix Custom Resolver Circular Dependency
+## 9. Fix Custom Resolver Circular Dependency
 
-In `amplify/backend.ts`, place the custom resolver in the data stack instead of its own stack:
+In `amplify/backend.ts`, place the custom resolver in the data stack instead of its own:
 
 ```diff
 -new customresolver_cdkStack(
@@ -217,10 +264,10 @@ In `amplify/backend.ts`, place the custom resolver in the data stack instead of 
 ```
 
 **Why:** The custom resolver depends on the GraphQL API ID from the data stack. Creating
-a separate stack causes a circular dependency: customresolver→data→auth→storage→auth.
-Placing it in the data stack eliminates the cross-stack reference.
+a separate stack causes a circular dependency between nested stacks. Placing it in the
+data stack eliminates the cross-stack reference since they share the same stack.
 
-## 9. Build Configuration: `amplify.yml`
+## 10. Build Configuration: `amplify.yml`
 
 Change `npm ci` to `npm install` in both backend and frontend build phases:
 
@@ -239,24 +286,9 @@ Change `npm ci` to `npm install` in both backend and frontend build phases:
 +        - npm install --cache .npm --prefer-offline
 ```
 
-**Why:** The build server's npm version differs from local, causing `npm ci` to fail with
-lockfile mismatch errors. `npm install` is more flexible with version resolution.
-
-## 10. Upgrade TypeScript to v5
-
-In `package.json`, upgrade TypeScript from v4 to v5:
-
-```diff
- "devDependencies": {
--  "typescript": "^4.9.5",
-+  "typescript": "^5.0.0",
- }
-```
-
-**Why:** The `@aws-amplify/data-schema` package uses `const` type parameters
-(`const values extends readonly string[]`) which require TypeScript 5.0+. The migration
-tool sets TypeScript to `^4.9.5` which can't parse these type declarations, causing
-hundreds of type errors in `node_modules/@aws-amplify/data-schema`.
+**Why:** The Amplify build server uses a different npm version than local development.
+`npm ci` requires an exact lockfile match and fails when the npm versions generate
+slightly different dependency trees. `npm install` is more flexible with resolution.
 
 ## 11. Clean Up Unused Imports in Custom Resources
 
@@ -267,51 +299,8 @@ In `amplify/custom/customresolver/resource.ts`, remove unused imports:
  import { Construct } from 'constructs';
 -import * as appsync from "aws-cdk-lib/aws-appsync";
  import * as iam from 'aws-cdk-lib/aws-iam';
--const branchName = process.env.AWS_BRANCH ?? "sandbox";
 -const projectName = "financetracker";
-+const branchName = process.env.AWS_BRANCH ?? "sandbox";
 ```
 
 **Why:** The `appsync` import is unused (code uses `cdk.aws_appsync.CfnDataSource` instead)
-and `projectName` is declared but never read. These cause TypeScript warnings.
-
-## 12. Fix Auth Mode for Lambda-Backed Operations
-
-In `src/App.tsx`, use `apiKey` auth mode for Lambda-backed operations and `userPool` for
-model operations:
-
-```diff
- // Model operations - use userPool (per-user data with owner field)
- const result = await client.graphql({ query: listTransactions, authMode: 'userPool' });
- await client.graphql({ query: createTransaction, variables: { input }, authMode: 'userPool' });
-
- // Lambda-backed operations - use apiKey (global public auth rule)
--const result = await client.graphql({ query: calculateFinancialSummaryQuery, authMode: 'userPool' });
-+const result = await client.graphql({ query: calculateFinancialSummaryQuery, authMode: 'apiKey' });
-
--const result = await client.graphql({ query: sendMonthlyReportMutation, variables: { email }, authMode: 'userPool' });
-+const result = await client.graphql({ query: sendMonthlyReportMutation, variables: { email }, authMode: 'apiKey' });
-
--const result = await client.graphql({ query: sendBudgetAlertMutation, variables: { ... }, authMode: 'userPool' });
-+const result = await client.graphql({ query: sendBudgetAlertMutation, variables: { ... }, authMode: 'apiKey' });
-
--const result = await client.graphql({ query: getTransactionsByCategoryQuery, variables: { ... }, authMode: 'userPool' });
-+const result = await client.graphql({ query: getTransactionsByCategoryQuery, variables: { ... }, authMode: 'apiKey' });
-```
-
-**Why:** The schema has two types of operations with different authorization:
-
-1. Model operations (`listTransactions`, `createTransaction`) - These are auto-generated
-   by the `@model` directive. With `defaultAuthorizationMode: 'userPool'`, they require
-   Cognito User Pool authentication. The `owner` field on models enforces per-user access.
-
-2. Custom operations (`calculateFinancialSummary`, `sendMonthlyReport`, `sendBudgetAlert`,
-   `getTransactionsByCategory`) - These use the `@function` directive or custom VTL
-   resolvers. They inherit the global auth rule `input AMPLIFY { globalAuthRule: AuthRule =
-   { allow: public } }` which maps to API key authentication. Sending `userPool` auth to
-   these operations causes "Not Authorized" errors because the schema's authorization rule
-   for these operations expects API key auth, not Cognito tokens.
-
-In Gen1, this wasn't an issue because the default auth mode was `apiKey` for everything.
-After switching to `userPool` as the default in Gen2, the client must explicitly specify
-the correct auth mode per operation type.
+and `projectName` is declared but never read.
