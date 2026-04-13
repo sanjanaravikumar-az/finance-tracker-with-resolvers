@@ -296,7 +296,7 @@ function App() {
       // Call Lambda function via GraphQL query (Lambda reads from DynamoDB)
       const result: any = await client.graphql({
         query: calculateFinancialSummaryQuery,
-        authMode: 'userPool',
+        authMode: 'apiKey',
       });
       setSummary(result.data.calculateFinancialSummary);
     } catch (error) {
@@ -317,7 +317,7 @@ function App() {
       const result: any = await client.graphql({
         query: getTransactionsByCategoryQuery,
         variables: { category: filterCategory, limit: 50 },
-        authMode: 'userPool',
+        authMode: 'apiKey',
       });
       setFilteredTransactions(result.data.getTransactionsByCategory.items || []);
       setShowFiltered(true);
@@ -347,7 +347,7 @@ function App() {
       const result: any = await client.graphql({
         query: sendMonthlyReportMutation,
         variables: { email: userEmail },
-        authMode: 'userPool',
+        authMode: 'apiKey',
       });
 
       console.log('Monthly report result:', result);
@@ -388,7 +388,7 @@ function App() {
       const result: any = await client.graphql({
         query: sendBudgetAlertMutation,
         variables: { email: userEmail, category: alertCategory, exceeded },
-        authMode: 'userPool',
+        authMode: 'apiKey',
       });
 
       if (result.data.sendBudgetAlert.success) {
