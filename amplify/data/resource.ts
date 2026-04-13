@@ -56,13 +56,13 @@ type TransactionConnection {
 }
 
 type Query {
-  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-dev")
-  getTransactionsByCategory(category: String!, limit: Int): TransactionConnection
+  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
+  getTransactionsByCategory(category: String!, limit: Int): TransactionConnection @aws_api_key @aws_cognito_user_pools
 }
 
 type Mutation {
-  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-dev")
-  sendBudgetAlert(email: String!, category: String!, exceeded: Float!): NotificationResult @function(name: "financetrackere30b1453-dev")
+  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
+  sendBudgetAlert(email: String!, category: String!, exceeded: Float!): NotificationResult @function(name: "financetrackere30b1453-dev") @aws_api_key @aws_cognito_user_pools
 }`;
 
 export const data = defineData({
@@ -78,7 +78,7 @@ export const data = defineData({
     },
   ],
   authorizationModes: {
-    defaultAuthorizationMode: 'apiKey',
+    defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: { expiresInDays: 365, description: 'graphql' },
   },
   schema,
