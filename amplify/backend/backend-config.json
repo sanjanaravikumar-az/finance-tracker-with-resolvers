@@ -71,7 +71,16 @@
   "function": {
     "financetrackerc3d67c94": {
       "build": true,
-      "dependsOn": [],
+      "dependsOn": [
+        {
+          "attributes": [
+            "BudgetAlertTopicArn",
+            "MonthlyReportTopicArn"
+          ],
+          "category": "custom",
+          "resourceName": "customfinance"
+        }
+      ],
       "providerPlugin": "awscloudformation",
       "service": "Lambda"
     }
