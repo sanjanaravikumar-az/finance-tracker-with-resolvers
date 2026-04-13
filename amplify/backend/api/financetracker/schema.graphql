@@ -54,11 +54,11 @@ type TransactionConnection {
 }
 
 type Query {
-  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-main")
+  calculateFinancialSummary: CalculatedSummary @function(name: "financetrackere30b1453-${env}")
   getTransactionsByCategory(category: String!, limit: Int): TransactionConnection
 }
 
 type Mutation {
-  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-main")
-  sendBudgetAlert(email: String!, category: String!, exceeded: Float!): NotificationResult @function(name: "financetrackere30b1453-main")
+  sendMonthlyReport(email: String!): NotificationResult @function(name: "financetrackere30b1453-${env}")
+  sendBudgetAlert(email: String!, category: String!, exceeded: Float!): NotificationResult @function(name: "financetrackere30b1453-${env}")
 }
